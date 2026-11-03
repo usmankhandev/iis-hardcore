@@ -1,0 +1,7 @@
+secretsprovider: awskms://alias/pulumi-secrets
+encryptedkey: AQICAHhyPCJZWgJ3E9vN6xceNu+JEFWZaImoL+xd3EqZl3yYlwE62zmcV3mjfUM3jLuasiPHAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMilnxRtk0LJS2ZQnaAgEQgDvyw7VWcqPRIz5k0YyNAxYhzem01Fwl0MLI1qFT2XvN5zqNI0XFq9h1kYRJ5hgv3HyTJqGfeAxOpJaMpw==
+config:
+  aws:region: us-east-1
+  aws:defaultTags:
+    tags:
+      Project: iis-hardcore

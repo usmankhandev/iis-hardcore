@@ -1,0 +1,10 @@
+name: iis-hardcore
+description: IIS/.NET Framework lab Infrastructure
+runtime:
+  name: python
+  options:
+    toolchain: uv
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: aws-python

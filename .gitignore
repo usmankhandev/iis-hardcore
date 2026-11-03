@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Ansible
+ansible/collections/
+ansible/artifacts/*
+!ansible/artifacts/.gitkeep
+*.retry
+
+# Secrets and keys: never committed
+.env
+*.pem
+*.pfx
+*.key
+.vault_pass*
+vault-password*
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
