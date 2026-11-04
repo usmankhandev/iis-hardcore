@@ -111,12 +111,14 @@ source = { virtual = "." }
 dependencies = [
     { name = "pulumi" },
     { name = "pulumi-aws" },
+    { name = "pulumi-random" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "pulumi", specifier = ">=3.0.0,<4.0.0" },
     { name = "pulumi-aws", specifier = ">=7.0.0,<8.0.0" },
+    { name = "pulumi-random", specifier = ">=4.21.6" },
 ]
 
 [[package]]
@@ -301,6 +303,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/58/d5/da86b2e94f3164e408b2887fcd3e5e1698c35378528889bee34facfdc5fc/pulumi_aws-7.53.0.tar.gz", hash = "sha256:95cf815dda03010b496b4add8f6a68a6dfc322efea5230f0e933702eae1b2c75", size = 9866892, upload-time = "2026-11-02T18:35:28.417Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/16/00/2e65969ee7259aa8b4299c2879b82847bd294e3d98253e2a4b54abc119c9/pulumi_aws-7.53.0-py3-none-any.whl", hash = "sha256:32e38df1af302249e9cac940857bfe8aba2bdda6befca4381f1626a5b0c2c29b", size = 13114473, upload-time = "2026-11-02T18:35:25.636Z" },
+]
+
+[[package]]
+name = "pulumi-random"
+version = "4.21.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+    { name = "pulumi" },
+    { name = "semver" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a0/9d/614f26ff80608d2e9ffdf4aa36d0bf95fea013d9555e1b94b091bedb1b18/pulumi_random-4.21.6.tar.gz", hash = "sha256:0f3e32a9882c42cc44b8669b8df4bdc66d8d0178ba172d0344922ed3b3791d72", size = 22797, upload-time = "2026-11-02T13:25:49.77Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ad/3e/67e5df1501864cc18090563c1f23ee1ee9d22357d0e4c7b9caabb430329e/pulumi_random-4.21.6-py3-none-any.whl", hash = "sha256:8f79e5dea85030fee287eec8d78ddfded33194c59b2c2a2d8771990980653a5d", size = 36098, upload-time = "2026-11-02T13:25:48.481Z" },
 ]
 
 [[package]]

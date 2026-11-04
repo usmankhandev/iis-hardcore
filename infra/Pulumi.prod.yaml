@@ -5,3 +5,4 @@ config:
   aws:defaultTags:
     tags:
       Project: iis-hardcore
+  iis-hardcore:vpcCidr: 10.11.0.0/16
