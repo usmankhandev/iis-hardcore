@@ -190,3 +190,77 @@ pulumi.export("ansible_param_name", ansible_param.name)
 pulumi.export("sql_param_name", sql_param.name)
 pulumi.export("web_role_name", web_role.name)
 pulumi.export("web_profile_name", web_profile.name)    
+
+
+read_policy = aws.iam.RolePolicy(name("read-ansible-password", "iam"), ...)
+
+
+instances_cfg = cfg.require_object("instances")
+
+AMI_PARAMS = {
+    "full": "/aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base",
+    "core": "/aws/service/ami-windows-latest/Windows_Server-2022-English-Core-Base"
+}
+
+ami_ids = {key: aws.ssm.get_parameter(name=path).value for key, path in AMI_PARAMS.items()}
+
+USER_DATA = r"""<powershell>
+
+    $ErrorActionPreference = 'Stop'
+    Start-Transcript - Path 'C:\ProgramData\bootstrap.log' -Append
+    $pw = null
+    for($i =1; $i -le 30 -and -not $pw; $i++) {
+        try {
+          $pw = (
+              $Get-SSMParameter -Name '__PARAM__' -WithDecryption $true -Region '__REGION__'
+          ).value
+        } catch {
+            Write-Output "SSM not ready (attempt $i): $_"; Start-Sleep -Seconds 10
+        }
+    }
+    
+    if (-not $pw) { throw 'Could not read the ansible password from SSM' }
+    $secure = ConvertTo-SecureString $pw -AsPlainText -Force
+    if (-not (Get-LocalUser -Name 'ansible' -ErrorAction SilentlyContinue)) {
+        New-LocalUser -Name 'ansible' -Password $secure -PasswordNeverExpires -AccountNeverExpires
+        Add-LocalGroupMember -Group 'Administrators' -Member 'ansible'
+    }
+    Enable-PSRemoting -SkipNetworkProfileCheck -Force
+
+    if (-not (Get-ChildItem WSMan:\localhost\Listener | Where-Object { $_.Keys -contains 'Transport=HTTPS' })) {
+        $cert = New-SelfSignedCertificate -DnsName $env:COMPUTERNAME -CertStoreLocation Cert:\LocalMachine\My
+        New-Item -Path WSMan:\localhost\Listener -Transport HTTPS -Address * -CertificateThumbPrint $cert.Thumbprint -Force
+    }
+    
+    if (-not (Get-NetFirewallRule -DisplayName 'WinRM HTTPS' -ErrorAction SilentlyContinue)) {
+        New-NetFirewallRule -DisplayName 'WinRM HTTPS' -Direction Inbound -Protocol TCP -LocalPort 5986 -Action Allow
+    }
+    Stop-Transcript
+    
+</powershell>
+""".replace("__PARAM__", ansible_param_name).replace("__REGION__", region)
+
+instances = {}
+
+for spec in instances_cfg:
+    roles = spec.get("roles", ["web"])
+    inst = aws.ec2.Instance(
+        name(spec["name"], "compute"),
+        ami=ami_ids[spec.get("image", "full")],
+        instance_type=spec["type"],
+        subnet_id=public_subnets[spec.get("az", 0)].id,
+        vpc_security_group_ids=[web_sg.id],
+        iam_instance_profile=web_profile.name,
+        user_data=USER_DATA,
+        root_block_device=aws.ec2.InstanceRootBlockDeviceArgs(
+            volume_size=spec.get("disk_gb", 60), volume_type="gp3", encrypted=True),
+        metadata_options=aws.ec2.InstanceMetadataOptionsArgs(http_tokens="required"),
+        tags={"Name": name(spec["name"], "compute"), "Roles": ",".join(roles)},
+        opts=pulumi.ResourceOptions(ignore_changes=["ami"], depends_on=[read_policy]),
+    )
+    instances[spec["name"]] = inst
+
+
+pulumi.export("instances", {
+    n: {"id": i.id, "public_ip": i.public_ip, "private_ip": i.private_ip} for n, i in instances.items()
+})
