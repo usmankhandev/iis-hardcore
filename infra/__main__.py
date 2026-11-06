@@ -3,12 +3,17 @@ import ipaddress
 import pulumi_aws as aws
 import json
 import pulumi_random as random
+import json
+from pathlib import Path
+
+
 
 
 cfg = pulumi.Config()
 env = pulumi.get_stack()
 project = pulumi.get_project()
 prefix = f"{project}-{env}"
+account_id = aws.get_caller_identity().account_id
 
 
 def name(resource: str, component:str = "network") -> str:
@@ -192,7 +197,30 @@ pulumi.export("web_role_name", web_role.name)
 pulumi.export("web_profile_name", web_profile.name)    
 
 
-read_policy = aws.iam.RolePolicy(name("read-ansible-password", "iam"), ...)
+policy_json = json.dumps({
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ssm:GetParameter"
+            ],
+            "Resource": (
+                f"arn:aws:ssm:{region}:{account_id}:"
+                f"parameter{ansible_param_name}"
+            )
+        }
+    ]
+})
+
+read_policy = aws.iam.RolePolicy(
+    name("read-ansible-password", "iam"),
+    role=web_role.id,
+    policy=policy_json,
+    opts=pulumi.ResourceOptions(
+        depends_on=[web_role]
+    ),
+)
 
 
 instances_cfg = cfg.require_object("instances")
@@ -204,42 +232,10 @@ AMI_PARAMS = {
 
 ami_ids = {key: aws.ssm.get_parameter(name=path).value for key, path in AMI_PARAMS.items()}
 
-USER_DATA = r"""<powershell>
 
-    $ErrorActionPreference = 'Stop'
-    Start-Transcript - Path 'C:\ProgramData\bootstrap.log' -Append
-    $pw = null
-    for($i =1; $i -le 30 -and -not $pw; $i++) {
-        try {
-          $pw = (
-              $Get-SSMParameter -Name '__PARAM__' -WithDecryption $true -Region '__REGION__'
-          ).value
-        } catch {
-            Write-Output "SSM not ready (attempt $i): $_"; Start-Sleep -Seconds 10
-        }
-    }
-    
-    if (-not $pw) { throw 'Could not read the ansible password from SSM' }
-    $secure = ConvertTo-SecureString $pw -AsPlainText -Force
-    if (-not (Get-LocalUser -Name 'ansible' -ErrorAction SilentlyContinue)) {
-        New-LocalUser -Name 'ansible' -Password $secure -PasswordNeverExpires -AccountNeverExpires
-        Add-LocalGroupMember -Group 'Administrators' -Member 'ansible'
-    }
-    Enable-PSRemoting -SkipNetworkProfileCheck -Force
-
-    if (-not (Get-ChildItem WSMan:\localhost\Listener | Where-Object { $_.Keys -contains 'Transport=HTTPS' })) {
-        $cert = New-SelfSignedCertificate -DnsName $env:COMPUTERNAME -CertStoreLocation Cert:\LocalMachine\My
-        New-Item -Path WSMan:\localhost\Listener -Transport HTTPS -Address * -CertificateThumbPrint $cert.Thumbprint -Force
-    }
-    
-    if (-not (Get-NetFirewallRule -DisplayName 'WinRM HTTPS' -ErrorAction SilentlyContinue)) {
-        New-NetFirewallRule -DisplayName 'WinRM HTTPS' -Direction Inbound -Protocol TCP -LocalPort 5986 -Action Allow
-    }
-    Stop-Transcript
-    
-</powershell>
-""".replace("__PARAM__", ansible_param_name).replace("__REGION__", region)
-
+USER_DATA = (Path(__file__).parent / "userdata" / "bootstrap.ps1").read_text() \
+      .replace("__PARAM__", ansible_param_name).replace("__REGION__", region)
+      
 instances = {}
 
 for spec in instances_cfg:
@@ -252,6 +248,7 @@ for spec in instances_cfg:
         vpc_security_group_ids=[web_sg.id],
         iam_instance_profile=web_profile.name,
         user_data=USER_DATA,
+        user_data_replace_on_change=True,
         root_block_device=aws.ec2.InstanceRootBlockDeviceArgs(
             volume_size=spec.get("disk_gb", 60), volume_type="gp3", encrypted=True),
         metadata_options=aws.ec2.InstanceMetadataOptionsArgs(http_tokens="required"),

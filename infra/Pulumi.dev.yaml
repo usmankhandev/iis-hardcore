@@ -3,4 +3,14 @@ encryptedkey: AQICAHhyPCJZWgJ3E9vN6xceNu+JEFWZaImoL+xd3EqZl3yYlwGLIPHAQAHf/QUJWF
 config:
   aws:region: us-east-1
   iis-hardcore:vpcCidr: 10.10.0.0/16
-  iis-hardcore:adminCidr: 119.73.111.92/32
+  iis-hardcore:adminCidr: 189.12.2.53/32
+  iis-hardcore:instances:
+    - name: web1
+      type: m7i-flex.large
+      image: full
+      az: 0
+      disk_gb: 100
+      roles:
+        - web
+        - build
+        - sql
