@@ -5,4 +5,8 @@ config:
   aws:defaultTags:
     tags:
       Project: iis-hardcore
+      Environment: prod
+      ManagedBy: pulumi
+      Component: iis-lab
+      CostCenter: lab
   iis-hardcore:vpcCidr: 10.11.0.0/16

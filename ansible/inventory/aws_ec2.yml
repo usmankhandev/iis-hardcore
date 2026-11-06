@@ -1,0 +1,13 @@
+plugin: amazon.aws.aws_ec2
+regions: [us-east-1]
+filters:
+  tag:Project: iis-hardcore
+  instance-state-name: running
+hostnames: [tag:Name]
+keyed_groups:
+  - key: tags.Environment
+    prefix: env
+  - key: tags.Roles.split(',')
+    prefix: role
+compose:
+  ansible_host: public_ip_address
