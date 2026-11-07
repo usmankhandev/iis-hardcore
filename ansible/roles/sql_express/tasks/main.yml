@@ -1,0 +1,71 @@
+- name: Install SQL Server Express (as SYSTEM, which becomes its sysadmin)
+  chocolatey.chocolatey.win_chocolatey:
+    name: sql-server-express
+    state: present
+    timeout: 3600
+  become: true
+  become_method: ansible.builtin.runas
+  become_user: SYSTEM
+
+- name: Static TCP port and mixed-mode authentication
+  ansible.windows.win_powershell:
+    parameters:
+      InstanceName: "{{ sql_instance_name }}"
+      Port: "{{ sql_port | string }}"
+    script: |
+      param($InstanceName, $Port)
+      $Ansible.Changed = $false
+      $id   = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL').$InstanceName
+      $base = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$id\MSSQLServer"
+      $tcp  = "$base\SuperSocketNetLib\Tcp"
+      $want = @(
+          @{ Path = $tcp;         Name = 'Enabled';         Value = 1 },
+          @{ Path = "$tcp\IPAll"; Name = 'TcpPort';         Value = $Port },
+          @{ Path = "$tcp\IPAll"; Name = 'TcpDynamicPorts'; Value = '' },
+          @{ Path = $base;        Name = 'LoginMode';       Value = 2 }
+      )
+      foreach ($w in $want) {
+          $cur = (Get-ItemProperty -Path $w.Path -Name $w.Name -ErrorAction SilentlyContinue).($w.Name)
+          if ("$cur" -ne "$($w.Value)") {
+              Set-ItemProperty -Path $w.Path -Name $w.Name -Value $w.Value
+              $Ansible.Changed = $true
+          }
+      }
+      if ($Ansible.Changed) { Restart-Service "MSSQL`$$InstanceName" -Force }
+
+- name: Open SQL Server's port in Windows Firewall
+  community.windows.win_firewall_rule:
+    name: "SQL Server {{ sql_port }}"
+    localport: "{{ sql_port }}"
+    protocol: tcp
+    direction: in
+    action: allow
+    profiles: [ domain, private, public ]
+    state: present
+
+- name: Create the application's SQL login
+  ansible.windows.win_powershell:
+    parameters:
+      InstanceName: "{{ sql_instance_name }}"
+      Login: "{{ sql_app_login }}"
+      Password: "{{ sql_app_password }}"
+    script: |
+      param($InstanceName, $Login, $Password)
+      $cn = New-Object System.Data.SqlClient.SqlConnection "Server=localhost\$InstanceName;Integrated Security=True"
+      $cn.Open()
+      $cmd = $cn.CreateCommand()
+      $cmd.CommandText = @"
+      IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = N'$Login')
+      BEGIN
+          CREATE LOGIN [$Login] WITH PASSWORD = N'$($Password.Replace("'", "''"))', CHECK_POLICY = OFF;
+          ALTER SERVER ROLE [dbcreator] ADD MEMBER [$Login];
+          SELECT 1;
+      END
+      ELSE SELECT 0;
+      "@
+      $Ansible.Changed = ([int]$cmd.ExecuteScalar() -eq 1)
+      $cn.Close()
+  become: true
+  become_method: ansible.builtin.runas
+  become_user: SYSTEM
+  no_log: true

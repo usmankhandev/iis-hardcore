@@ -1,0 +1,23 @@
+- name: Install the .NET Framework build toolchain
+  chocolatey.chocolatey.win_chocolatey:
+    name: "{{item.name}}"
+    package_params: "{{item.params | default(omit)}}"
+    state: present
+    timeout: 5400
+  loop: "{{build_packages}}"
+  loop_control:
+    label: "{{item.name}}"
+  become: true
+  become_method: ansible.builtin.runas
+  become_user: SYSTEM
+
+- name: Clone the application source
+  ansible.windows.win_command: '"{{git_path}}" clone --depth 1 {{app_repo}} "{{src_dir}}"'
+  args:
+    creates: '{{src_dir}}\.git'
+
+- name: Verify MSBuild is Present
+  ansible.windows.win_stat:
+    path: "{{msbuild_path}}"
+  register: msbuild
+  failed_when: not msbuild.stat.exists

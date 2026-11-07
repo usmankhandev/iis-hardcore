@@ -1,0 +1,7 @@
+build_packages:
+- name: git
+- name: nuget.commandline
+- name: netfx-4.8-devpack
+- name: netfx-4.7.2-devpack
+- name: visualstudio2022buildtools
+  params: "--add Microsoft.VisualStudio.Workload.WebBuildTools --includeRecommended"

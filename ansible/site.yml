@@ -7,3 +7,13 @@
   hosts: role_web
   roles:
   - iis_site
+
+- name: Build toolchain on build nodes
+  hosts: role_build
+  roles:
+  - build_agent
+
+- name: SQL Server Express on database nodes
+  hosts: role_sql
+  roles:
+  - sql_express

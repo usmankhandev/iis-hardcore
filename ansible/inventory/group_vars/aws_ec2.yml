@@ -7,3 +7,15 @@ ansible_password: "{{ lookup('ansible.builtin.env', 'IIS_WIN_PASSWORD') }}"
 
 app_name: 'eshop'
 app_root: 'C:\apps\eshop'
+
+# source and build paths for the application
+
+app_repo: https://github.com/dotnet-architecture/eShopModernizing.git
+src_dir: 'C:\src\eshop'
+git_path: 'C:\Program Files\Git\cmd\git.exe'
+msbuild_path: 'C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\MSBuild.exe'
+
+# database
+
+sql_app_login: eshop_app
+sql_app_password: "{{ lookup('ansible.builtin.env', 'IIS_SQL_PASSWORD') }}"
