@@ -132,6 +132,8 @@ rule_in("web-rdp-admin", web_sg, "RDP from admin IP", ip_protocol="tcp", from_po
 rule_in("web-winrm-admin", web_sg, "WinRM HTTPS (Ansible) from admin IP", ip_protocol="tcp", from_port=5986, to_port=5986,
         cidr_ipv4=admin_cidr)
 rule_in("web-intra", web_sg, "Node to node (SQL 1433)", ip_protocol="-1", referenced_security_group_id=web_sg.id)
+rule_in("web-http-admin", web_sg, "HTTP direct from admin IP (dev testing)",
+        ip_protocol="tcp", from_port=80, to_port=80, cidr_ipv4=admin_cidr)
 rule_out_all("web-out", web_sg)
 
 pulumi.export("alb_sg_id", alb_sg.id)

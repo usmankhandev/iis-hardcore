@@ -2,3 +2,8 @@
   hosts: aws_ec2
   roles:
   - windows_baseline
+
+- name: IIS app pool and site on web nodes
+  hosts: role_web
+  roles:
+  - iis_site

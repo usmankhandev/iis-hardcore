@@ -22,5 +22,3 @@ iis_features:
 
 iis_gui_features:
 - Web-Mgmt-Console
-
-app_root: 'C:\app\eshop'

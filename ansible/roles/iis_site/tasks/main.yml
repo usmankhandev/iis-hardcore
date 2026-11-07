@@ -1,0 +1,93 @@
+- name: Ensure the placeholder release folder exists
+  ansible.windows.win_file:
+    path: '{{ app_root }}\releases\placeholder'
+    state: directory
+
+- name: Placeholder release so the site has something to serve before the first deployment
+  ansible.windows.win_copy:
+    content: "{{site_name}}: no releases have been deployed yet"
+    dest: '{{ app_root }}\releases\placeholder\index.html'
+    force: yes
+
+- name: App pool and website with production settings
+  ansible.windows.win_powershell:
+    parameters:
+      PoolName: "{{app_name}}"
+      SiteName: "site_name"
+      Port: "{{site_port | string}}"
+      InitialPath: '{{app_root}}\releases\placeholder'
+      Recycleat: "{{app_pool_recycle_at}}"
+    script: |
+      param(
+        [string]$poolName,
+        [string]$siteName,
+        [int]$port,
+        [string]$InitialPath,
+        [string]$Recycleat
+      )
+      Import-Module WebAdministration
+      $Ansible.Changed = $false
+      function Get-Val($path, $name) {
+        $v = Get-ItemProperty -Path $path -Name $name -ErrorAction SilentlyContinue
+        if ($v -is [Microsoft.IIs.Powershell.Framework.ConfigurationAttribute]) {
+          return $v.Value
+        }
+      }
+
+      # app pool
+
+      $pool = "IIS:\AppPools\$PoolName"
+      if(-not (Test-Path $pool)) {
+        New-WebAppPool -Name $PoolName | Out-Null; $Ansible.Changed = $true
+      }
+
+      $want = [ordered]@{
+        'managedRuntimeVersion' = '4.0'
+        'managedPipelineMode' = 'Integrated'
+        'startMode' = 'AlwaysRunning'
+        'processModel.idleTimeout' = '00:00:00'
+        'recycling.periodicRestart.time' = $Recycleat
+      }
+
+      foreach($k in $want.Keys) {
+        $have = Get-Val $pool $k
+        if($have -ne $want[$k]) {
+          Set-ItemProperty -Path $pool -Name $k -Value $want[$k]
+          $Ansible.Changed = $true
+        }
+      }
+
+      $sched = @(Get-ItemProperty -Path $pool -Name 'recycling.periodicRestart.schedule' -ErrorAction SilentlyContinue).Value
+      if ($sched -ne $RecycleAt) {
+        Clear-ItemProperty $pool -Name recycling.periodicRestart.schedule
+        Set-ItemProperty $pool -Name recycling.periodicRestart.schedule -Value @{ value = $RecycleAt }        
+        $Ansible.Changed = $true
+      }
+
+      # website
+
+      $site = "IIS:\Sites\$SiteName"
+      if(-not (Test-Path $site)) {
+        New-Website -Name $SiteName -Port $Port -PhysicalPath $InitialPath
+        $Ansible.Changed = $true
+      }
+
+      if ((Get-Val $site 'applicationDefaults.preloadEnabled') -ne 'True') {
+        Set-ItemProperty $site -Name applicationDefaults.preloadEnabled -Value $true
+        $Ansible.Changed = $true
+      }
+
+      if((Get-WebsiteState -Name $SiteName).Value -ne 'Started') {
+        Start-Website -Name $SiteName
+        $Ansible.Changed = $true
+      }
+
+- name: App pool identity can read the application folder
+  ansible.windows.win_acl:
+    path: "{{ app_root }}"
+    user: 'IIS AppPool\{{ app_pool_name }}'
+    rights: ReadAndExecute
+    type: allow
+    state: present
+    inherit: ContainerInherit, ObjectInherit
+    propagation: None
