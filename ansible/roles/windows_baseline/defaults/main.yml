@@ -1,0 +1,26 @@
+iis_features:
+- Web-Server
+- Web-WebServer
+- Web-Common-Http
+- Web-Default-Doc
+- Web-Dir-Browsing
+- Web-Http-Errors
+- Web-Static-Content
+- Web-Health
+- Web-Http-Logging
+- Web-Log-Libraries
+- Web-Request-Monitor
+- Web-Http-Tracing
+- Web-Security
+- Web-Basic-Auth
+- Web-Windows-Auth
+- Web-AppInit
+- Web-Asp-Net45
+- Web-Net-Ext45
+- Web-ISAPI-Ext
+- Web-ISAPI-Filter
+
+iis_gui_features:
+- Web-Mgmt-Console
+
+app_root: 'C:\app\eshop'

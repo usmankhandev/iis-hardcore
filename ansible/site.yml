@@ -1,0 +1,4 @@
+- name: Baseline every Windows node
+  hosts: aws_ec2
+  roles:
+  - windows_baseline
