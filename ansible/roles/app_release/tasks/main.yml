@@ -1,0 +1,83 @@
+- name: Copy, unpack and configure the release (skipped on rollback)
+  when: not rollback | bool
+  block:
+  - name: Copy the artifact to the server
+    ansible.windows.win_copy:
+      src: "{{ playbook_dir }}/artifacts/{{ app_name }}-{{ release_version }}.zip"
+      dest: "{{ package_path }}"
+
+  - name: Unpack into a new versioned release folder
+    community.windows.win_unzip:
+      src: "{{ package_path }}"
+      dest: "{{ release_dir }}"
+      creates: '{{ release_dir }}\Web.config'
+
+  - name: Apply environment appSettings
+    community.windows.win_xml:
+      path: '{{ release_dir }}\Web.config'
+      xpath: "/configuration/appSettings/add[@key='{{ item.key }}']"
+      attribute: value
+      fragment: "{{ item.value }}"
+      type: attribute
+    loop: "{{ app_settings | default({}) | dict2items }}"
+    loop_control:
+      label: "{{ item.key }}"
+
+  - name: Apply environment connection strings
+    community.windows.win_xml:
+      path: '{{ release_dir }}\Web.config'
+      xpath: "/configuration/connectionStrings/add[@name='{{ item.key }}']"
+      attribute: connectionString
+      fragment: "{{ item.value }}"
+      type: attribute
+    loop: "{{ connection_strings | default({}) | dict2items }}"
+    loop_control:
+      label: "{{ item.key }}"
+    no_log: true
+
+- name: Switch IIS to release {{ release_version }}
+  ansible.windows.win_powershell:
+    parameters:
+      SiteName: "{{ site_name }}"
+      PoolName: "{{ app_pool_name }}"
+      Target: "{{ release_dir }}"
+    script: |
+      param($SiteName, $PoolName, $Target)
+      $ErrorActionPreference = 'Stop'
+      Import-Module WebAdministration
+      if (-not (Test-Path (Join-Path $Target 'Web.config'))) { throw "Release folder $Target is missing or incomplete" }
+      $current = (Get-ItemProperty "IIS:\Sites\$SiteName" -Name physicalPath)
+      if ($current -eq $Target) { $Ansible.Changed = $false; return }
+      Set-ItemProperty "IIS:\Sites\$SiteName" -Name physicalPath -Value $Target
+      if ((Get-WebAppPoolState -Name $PoolName).Value -eq 'Started') { Restart-WebAppPool -Name $PoolName }
+      else { Start-WebAppPool -Name $PoolName }
+      $Ansible.Changed = $true
+
+- name: Health check, waiting for warm-up (HTTP 200 on {{ health_path }})
+  ansible.windows.win_uri:
+    url: "http://localhost:{{ site_port }}{{ health_path }}"
+    status_code: 200
+    timeout: 60
+  register: health
+  retries: "{{ health_retries }}"
+  delay: "{{ health_delay }}"
+  until: (health.status_code | default(0)) == 200
+
+- name: Record the live release
+  ansible.windows.win_copy:
+    content: "{{ release_version }}"
+    dest: '{{ app_root }}\current.txt'
+
+- name: Keep only the newest releases
+  ansible.windows.win_powershell:
+    parameters:
+      Releases: '{{ app_root }}\releases'
+      Keep: "{{ releases_to_keep | string }}"
+      Current: "{{ release_version }}"
+    script: |
+      param($Releases, $Keep, $Current)
+      $old = Get-ChildItem $Releases -Directory |
+          Where-Object { $_.Name -notin @($Current, 'placeholder') } |
+          Sort-Object LastWriteTime -Descending | Select-Object -Skip ([int]$Keep - 1)
+      $Ansible.Changed = [bool]$old
+      $old | Remove-Item -Recurse -Force

@@ -1,0 +1,51 @@
+# Build ONCE, then promote the same zip to every environment.
+#   uv run ansible-playbook build.yml -l env_dev -e app_version=1.0.0
+- name: Build and package the application
+  hosts: role_build
+  gather_facts: false
+  vars:
+    version: "{{ app_version | mandatory }}"
+    publish_dir: '{{ build_root }}\{{ app_name }}\{{ version }}'
+    package: '{{ build_root }}\{{ app_name }}-{{ version }}.zip'
+
+  tasks:
+  - name: Ensure the build folder exists
+    ansible.windows.win_file:
+      path: "{{ build_root }}"
+      state: directory
+
+  - name: Restore NuGet packages (packages.config project)
+    ansible.windows.win_command: >-
+      "{{ nuget_path }}" restore "{{ app_project }}" -SolutionDirectory "{{ app_solution_dir }}" -NonInteractive
+    changed_when: false
+
+  - name: Compile and publish with MSBuild (.NET Framework 4.7.2)
+    ansible.windows.win_command: >-
+      "{{ msbuild_path }}" "{{ app_project }}" /p:Configuration=Release /p:DeployOnBuild=true /p:DeployDefaultTarget=WebPublish /p:WebPublishMethod=FileSystem /p:PublishUrl="{{ publish_dir }}" /p:DeleteExistingFiles=true /m /nologo /v:minimal
+
+  - name: Zip the published output as the versioned artifact
+    ansible.windows.win_powershell:
+      script: |
+        $ErrorActionPreference = 'Stop'
+        if (-not (Test-Path '{{ publish_dir }}\Web.config')) {
+            throw 'Publish output missing Web.config: MSBuild did not publish to {{ publish_dir }}'
+        }
+        Compress-Archive -Path '{{ publish_dir }}\*' -DestinationPath '{{ package }}' -Force
+
+  - name: Record the artifact checksum
+    ansible.windows.win_stat:
+      path: "{{ package }}"
+      get_checksum: true
+      checksum_algorithm: sha256
+    register: artifact
+    failed_when: not artifact.stat.exists
+
+  - name: Show artifact details
+    ansible.builtin.debug:
+      msg: "{{ package }}  size={{ artifact.stat.size }}  sha256={{ artifact.stat.checksum }}"
+
+  - name: Fetch the artifact to the control node
+    ansible.builtin.fetch:
+      src: "{{ package }}"
+      dest: "{{ playbook_dir }}/artifacts/"
+      flat: true

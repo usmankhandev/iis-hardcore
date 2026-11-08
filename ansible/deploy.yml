@@ -1,0 +1,11 @@
+# Rolling release, one node at a time. A failed health check stops the run.
+#   uv run ansible-playbook deploy.yml -l env_dev -e app_version=1.0.0
+- name: Release the application
+  hosts: role_web
+  serial: 1
+  max_fail_percentage: 0
+  gather_facts: false
+  vars:
+    release_version: "{{ app_version | mandatory }}"
+  roles:
+    - app_release

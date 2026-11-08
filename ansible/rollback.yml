@@ -1,0 +1,12 @@
+# Point IIS back at a release folder that's still on disk. Seconds, no rebuild.
+#   uv run ansible-playbook rollback.yml -l env_dev -e app_version=1.0.0
+- name: Roll back to an existing release
+  hosts: role_web
+  serial: 1
+  max_fail_percentage: 0
+  gather_facts: false
+  vars:
+    release_version: "{{ app_version | mandatory }}"
+    rollback: true
+  roles:
+    - app_release

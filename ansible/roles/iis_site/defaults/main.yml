@@ -1,5 +1,1 @@
-site_name: "{{app_name}}"
-app_pool_name: "{{app_name}}"
-
-site_port: 80
 app_pool_recycle_at: '03:00:00'

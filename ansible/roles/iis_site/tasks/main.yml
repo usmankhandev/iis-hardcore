@@ -12,8 +12,8 @@
 - name: App pool and website with production settings
   ansible.windows.win_powershell:
     parameters:
-      PoolName: "{{app_name}}"
-      SiteName: "site_name"
+      PoolName: "{{app_pool_name}}"
+      SiteName: "{{site_name}}"
       Port: "{{site_port | string}}"
       InitialPath: '{{app_root}}\releases\placeholder'
       Recycleat: "{{app_pool_recycle_at}}"
@@ -42,7 +42,7 @@
       }
 
       $want = [ordered]@{
-        'managedRuntimeVersion' = '4.0'
+        'managedRuntimeVersion' = 'v4.0'
         'managedPipelineMode' = 'Integrated'
         'startMode' = 'AlwaysRunning'
         'processModel.idleTimeout' = '00:00:00'
@@ -68,7 +68,7 @@
 
       $site = "IIS:\Sites\$SiteName"
       if(-not (Test-Path $site)) {
-        New-Website -Name $SiteName -Port $Port -PhysicalPath $InitialPath
+        New-Website -Name $SiteName -Port ([int]$Port) -PhysicalPath $InitialPath -ApplicationPool $PoolName | Out-Null 
         $Ansible.Changed = $true
       }
 

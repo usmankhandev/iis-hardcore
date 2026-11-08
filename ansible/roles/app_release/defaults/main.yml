@@ -1,0 +1,7 @@
+rollback: false
+releases_to_keep: 3
+release_dir: '{{ app_root }}\releases\{{ release_version }}'
+package_path: '{{ app_root }}\packages\{{ app_name }}-{{ release_version }}.zip'
+health_path: /
+health_retries: 20
+health_delay: 6

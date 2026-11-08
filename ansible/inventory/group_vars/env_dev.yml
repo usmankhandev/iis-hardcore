@@ -1,0 +1,5 @@
+app_settings:
+  UseMockData: "true"
+connection_strings:
+  CatalogDBContext: >-
+    Data Source=localhost,1433;Initial Catalog=eShopCatalog;User ID={{sql_app_login}};Password={{sql_app_password}};MultipleActiveResultSets=True

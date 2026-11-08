@@ -5,6 +5,11 @@ ansible_winrm_server_cert_validation: ignore
 ansible_user: ansible
 ansible_password: "{{ lookup('ansible.builtin.env', 'IIS_WIN_PASSWORD') }}"
 
+site_name: "{{app_name}}"
+app_pool_name: "{{app_name}}"
+
+site_port: 80
+
 app_name: 'eshop'
 app_root: 'C:\apps\eshop'
 
@@ -19,3 +24,8 @@ msbuild_path: 'C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MS
 
 sql_app_login: eshop_app
 sql_app_password: "{{ lookup('ansible.builtin.env', 'IIS_SQL_PASSWORD') }}"
+
+app_solution_dir: '{{ src_dir }}\eShopLegacyMVCSolution'
+app_project: '{{ app_solution_dir }}\src\eShopLegacyMVC\eShopLegacyMVC.csproj'
+nuget_path: 'C:\ProgramData\chocolatey\bin\nuget.exe'
+build_root: 'C:\build'
