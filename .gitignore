@@ -10,7 +10,7 @@ ansible/artifacts/*
 !ansible/artifacts/.gitkeep
 *.retry
 
-# Secrets and keys: never committed
+# Secrets and keys: never commit
 .env
 *.pem
 *.pfx
